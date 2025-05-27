@@ -1,16 +1,49 @@
-# ✅ signal_logic.py – faqat indikatorlar asosida
+# ✅ signal_logic.py – AI + Scoring asosida mukammal KUCHLI signal logikasi
 import pandas as pd
+from ai_model import predict_from_model
 from config import RSI_OVERBOUGHT, RSI_OVERSOLD, MIN_CONFIDENCE
 
-def evaluate_confidence(row):
-    score = 0.0
-    if row['ema_fast'] > row['ema_slow']:
-        score += 0.3
-    if row['macd'] > row['macd_signal']:
-        score += 0.3
-    if RSI_OVERSOLD < row['rsi'] < RSI_OVERBOUGHT:
-        score += 0.4
-    return round(min(score, 1.0), 2)
+# 📊 Ball tizimi asosida indikatorni baholash
+
+def score_indicators(row, signal):
+    score = 0
+    ema_fast = row['ema_fast']
+    ema_slow = row['ema_slow']
+    macd = row['macd']
+    macd_signal = row['macd_signal']
+    rsi = row['rsi']
+    stoch_rsi = row.get('stoch_rsi', 0.5)
+    adx = row.get('adx', 0)
+
+    print(f"📊 Indikatorlar: EMA_FAST={ema_fast}, EMA_SLOW={ema_slow}, MACD={macd}, MACD_SIGNAL={macd_signal}, RSI={rsi}, STOCH_RSI={stoch_rsi}, ADX={adx}")
+
+    if signal == "buy":
+        if ema_fast > ema_slow:
+            score += 1
+        if macd > macd_signal:
+            score += 1
+        if rsi < RSI_OVERBOUGHT:
+            score += 1
+        if stoch_rsi <= 0.8:
+            score += 1
+        if adx > 20:
+            score += 1
+
+    elif signal == "sell":
+        if ema_fast < ema_slow:
+            score += 1
+        if macd < macd_signal:
+            score += 1
+        if rsi > RSI_OVERSOLD:
+            score += 1
+        if stoch_rsi >= 0.2:
+            score += 1
+        if adx > 20:
+            score += 1
+
+    return score
+
+# 🧠 Asosiy signal generator – AI + ball + confidence
 
 def generate_signal(df: pd.DataFrame) -> tuple:
     if df is None or df.empty:
@@ -18,39 +51,28 @@ def generate_signal(df: pd.DataFrame) -> tuple:
 
     last = df.iloc[-1]
 
-    ema_fast = last.get('ema_fast')
-    ema_slow = last.get('ema_slow')
-    rsi = last.get('rsi')
-    macd = last.get('macd')
-    macd_signal = last.get('macd_signal')
-    adx = last.get('adx')
-    stoch_rsi = last.get('stoch_rsi')
-
-    if any(x is None or pd.isna(x) for x in [ema_fast, ema_slow, rsi, macd, macd_signal]):
+    try:
+        pred, confidence = predict_from_model(last)
+        signal = pred.lower()
+    except Exception as e:
+        print(f"❌ AI model ishlamayapti: {e}")
         return None, 0.0
 
-    signal = None
-    if ema_fast > ema_slow and macd > macd_signal and rsi < RSI_OVERBOUGHT:
-        signal = 'buy'
-    elif ema_fast < ema_slow and macd < macd_signal and rsi > RSI_OVERSOLD:
-        signal = 'sell'
+    score = score_indicators(last, signal)
 
-    confidence = evaluate_confidence(last)
+    # ✅ Minimal shartlar: AI ishonchi va indikator bal
+    if confidence >= MIN_CONFIDENCE and score >= 3:
 
-    extra_match = 0
-    if adx is not None and not pd.isna(adx):
-        if adx > 20:
-            extra_match += 1
-    if stoch_rsi is not None and not pd.isna(stoch_rsi):
-        if signal == 'buy' and stoch_rsi < 0.8:
-            extra_match += 1
-        elif signal == 'sell' and stoch_rsi > 0.2:
-            extra_match += 1
+        # 💡 KUCHLI signal sharti
+        adx = last.get("adx", 0)
+        stoch_rsi = last.get("stoch_rsi", 0.5)
+        if confidence >= 0.85 and adx > 20:
+            if signal == "buy" and stoch_rsi <= 0.8:
+                signal = "KUCHLI BUY"
+            elif signal == "sell" and stoch_rsi >= 0.2:
+                signal = "KUCHLI SELL"
 
-    if signal and extra_match >= 2:
-        signal = f"KUCHLI {signal.upper()}"
-
-    if confidence >= MIN_CONFIDENCE:
         return signal, confidence
     else:
+        print("⚠️ Shartlar yetarli emas.")
         return None, confidence

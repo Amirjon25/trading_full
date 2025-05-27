@@ -1,70 +1,111 @@
-# ✅ main.py – API orqali AI'siz, rotatsion timeframe signal tekshirish (1 minutda 1 timeframe)
+# ✅ main.py – Trading botni ishga tushirish va boshqarish
 import time
 import threading
+import traceback
 import matplotlib.pyplot as plt
-from config import SYMBOL, TIMEFRAMES, CHECK_INTERVAL
 from data_fetcher import fetch_data
 from indicators import apply_indicators
 from signal_logic import generate_signal
-from telegram_bot import send_message, send_chart, is_paused, start_bot_polling
+from logger import save_to_csv, is_duplicate_signal
 from utils.trade import calculate_sl_tp, send_order
-from logger import save_to_csv
+from config import SYMBOL, TIMEFRAMES, CHECK_INTERVAL
+from telegram_bot import send_message, send_chart, is_paused, start_bot_polling
 
-print("✅ Bot ishga tushdi")
-threading.Thread(target=start_bot_polling, daemon=True).start()
 
-# 🔄 Timeframe indeksini boshqarish uchun
-tf_index = 0
+def run_trading_loop():
+    tf_index = 0
+    print("✅ Trading loop boshlandi")
 
-while True:
-    if is_paused():
-        print("⏸ Signal yuborish to‘xtatilgan.")
-        time.sleep(CHECK_INTERVAL)
-        continue
+    while True:
+        if is_paused():
+            print("⏸ Bot pauzaga olingan.")
+            time.sleep(CHECK_INTERVAL)
+            continue
 
-    # 🔁 Faqat 1ta timeframe har daqiqada tekshiriladi (rotatsion)
-    tf_name = TIMEFRAMES[tf_index]
-    tf_index = (tf_index + 1) % len(TIMEFRAMES)
-
-    print(f"🔎 {SYMBOL} ({tf_name}) timeframe tekshirilmoqda...")
-    df = fetch_data(symbol=SYMBOL, interval=tf_name)
-
-    if df is None or df.empty:
-        time.sleep(CHECK_INTERVAL)
-        continue
-
-    df = apply_indicators(df)
-    signal, confidence = generate_signal(df)
-
-    if signal in ['buy', 'sell', 'KUCHLI BUY', 'KUCHLI SELL']:
-        price = df.iloc[-1]['close']
-        sl, tp = calculate_sl_tp(df, signal.lower().replace("kuchli ", ""))
-
-        msg = f"\n📢 {SYMBOL} | {tf_name}\nSignal: {signal}\nConfidence: {confidence*100:.0f}%\nPrice: {price:.2f}\nSL: {sl:.2f} | TP: {tp:.2f}"
-        send_message(msg)
-
-        # Grafik chizish
-        plt.figure(figsize=(10, 4))
-        df_tail = df.tail(50)
-        plt.plot(df_tail['time'], df_tail['close'], label='Close Price')
-        plt.axvline(df_tail['time'].iloc[-1], color='green' if 'BUY' in signal else 'red', linestyle='--')
-        plt.title(f"{SYMBOL} - {tf_name} - {signal}")
-        plt.xlabel("Time")
-        plt.ylabel("Price")
-        plt.grid(True)
-        plt.tight_layout()
-        chart_path = f"chart_{SYMBOL}_{tf_name}.png"
-        plt.savefig(chart_path)
-        plt.close()
-        send_chart(chart_path)
-
-        save_to_csv(SYMBOL, tf_name, signal, confidence, price)
+        timeframe = TIMEFRAMES[tf_index]
+        tf_index = (tf_index + 1) % len(TIMEFRAMES)
 
         try:
-            send_order(SYMBOL, signal.lower().replace("kuchli ", ""), 0.01, sl, tp)
-        except Exception as e:
-            print(f"❌ Order yuborishda xatolik: {e}")
-    else:
-        print(f"ℹ️ {SYMBOL} ({tf_name}): signal yo'q (Confidence: {confidence*100:.0f}%)")
+            print(f"🔎 {SYMBOL} ({timeframe}) tekshirilmoqda...")
+            df = fetch_data(symbol=SYMBOL, interval=timeframe)
 
-    time.sleep(CHECK_INTERVAL)
+            if df is None or df.empty:
+                print("⚠️ Ma'lumot yo'q yoki bo'sh dataframe.")
+                time.sleep(CHECK_INTERVAL)
+                continue
+
+            df = apply_indicators(df)
+            signal, confidence = generate_signal(df)
+
+            last = df.iloc[-1]
+            price = last['close']
+
+            if not signal:
+                print(f"ℹ️ Signal mavjud emas (Confidence: {confidence*100:.0f}%)")
+                time.sleep(CHECK_INTERVAL)
+                continue
+
+            # 🔁 Takroriy signalni tekshirish
+            if is_duplicate_signal(SYMBOL, timeframe, signal, price):
+                print("⚠️ Takroriy signal, logga yozilmadi.")
+                time.sleep(CHECK_INTERVAL)
+                continue
+
+            try:
+                # 📐 SL/TP hisoblash
+                sl, tp = calculate_sl_tp(df, signal.lower().replace("kuchli ", ""))
+            except Exception as e:
+                print(f"❌ SL/TP hisoblashda xato: {e}")
+                continue
+
+            # 📩 Telegram xabari
+            msg = (
+                f"📍 {SYMBOL} | {timeframe}\n"
+                f"🔔 Signal: {signal}\n"
+                f"🎯 Ishonch: {confidence*100:.1f}%\n"
+                f"💰 Narx: {price:.2f}\n"
+                f"🛡 SL: {sl:.2f} | 🎯 TP: {tp:.2f}"
+            )
+
+
+            # 📈 Grafik chizish va yuborish
+            try:
+                df_tail = df.tail(50)
+                plt.figure(figsize=(10, 4))
+                plt.plot(df_tail['time'], df_tail['close'], label='Close Price')
+                color = 'green' if 'BUY' in signal.upper() else 'red'
+                plt.axvline(df_tail['time'].iloc[-1], color=color, linestyle='--')
+                plt.title(f"{SYMBOL} - {timeframe} - {signal}")
+                plt.xlabel("Time")
+                plt.ylabel("Price")
+                plt.grid(True)
+                plt.tight_layout()
+
+                chart_path = f"chart_{SYMBOL.replace('/', '_')}_{timeframe}.png"
+                plt.savefig(chart_path)
+                plt.close()
+                send_chart(chart_path, caption=msg)
+            except Exception as e:
+                print(f"❌ Grafik chizishda xato: {e}")
+
+            # 🗃 Signalni logga yozish
+            save_to_csv(SYMBOL, timeframe, signal, confidence, price)
+
+            # 🛒 Order yuborish
+            try:
+                send_order(SYMBOL, signal.lower().replace("kuchli ", ""), 0.01, sl, tp)
+            except Exception as e:
+                print(f"❌ Order yuborishda xato: {e}")
+
+        except Exception:
+            err = traceback.format_exc()
+            print(f"❌ Bot siklda xato:\n{err}")
+            send_message(f"❌ Botda xatolik:\n{err}")
+
+        time.sleep(CHECK_INTERVAL)
+
+
+if __name__ == "__main__":
+    print("🤖 Telegram bot ishga tushmoqda...")
+    threading.Thread(target=start_bot_polling, daemon=True).start()
+    run_trading_loop()

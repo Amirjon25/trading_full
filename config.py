@@ -1,33 +1,40 @@
-# ✅ config.py (Twelve Data versiyasi)
+# ✅ config.py – Konfiguratsiya parametrlarini markazlashtirish
 import os
 from dotenv import load_dotenv
 
+# 🔄 .env fayldan token va IDlarni yuklaymiz
 load_dotenv()
 
-# 📡 API va Telegram sozlamalar
-API_KEY = os.getenv("API_KEY") or "9cdcbb93d65249b399e19a4fa2c4498f"
+# --- Telegram va API kalitlari ---
+API_KEY = os.getenv("API_KEY")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
-CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 
-# 🕒 Timeframe konfiguratsiyasi
-TIMEFRAMES = ["15min", "30min", "1h"]
-
+# --- Trading sozlamalari ---
 SYMBOL = "XAU/USD"
-CHECK_INTERVAL = 60  # har 1 daqiqa
+TIMEFRAMES = ["15min", "30min", "1h"]  # Foydalaniladigan timeframe’lar
+CHECK_INTERVAL = 60  # sekundlarda tekshirish oraliği
 
-# 📈 Indikator sozlamalari
-RSI_OVERBOUGHT = 70
-RSI_OVERSOLD = 30
+# --- Indikator parametrlar ---
+RSI_OVERBOUGHT = 70.0
+RSI_OVERSOLD = 30.0
 EMA_FAST_PERIOD = 9
 EMA_SLOW_PERIOD = 21
 MACD_FAST = 12
 MACD_SLOW = 26
 MACD_SIGNAL = 9
-MIN_CONFIDENCE = 0.6
 
-# 🌐 Twelve Data API manzili
-TWELVE_URL = "https://api.twelvedata.com/time_series"
+# --- AI signal minimal ishonchlilik ---
+MIN_CONFIDENCE = 0.6  # Asosiy model uchun
+HIGH_CONFIDENCE = 0.85  # KUCHLI signal uchun
 
-# 📁 Signal log fayli
+# --- Backtest va AI baholash uchun ---
+BACKTEST_MATRIX = "backtest_confusion_matrix.png"
+BACKTEST_CONFIDENCE = "backtest_confidence.png"
+
+# --- Fayllar nomi va joylashuvi ---
 CSV_LOG = "signals.csv"
+CLEANED_CSV = "signals_cleaned.csv"
+MODEL_FILE = "model.pkl"
+ALLOWED_USERS_FILE = "allowed_users.json"
+TWELVE_URL = "https://api.twelvedata.com/time_series"
