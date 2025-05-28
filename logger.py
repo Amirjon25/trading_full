@@ -3,12 +3,13 @@ import os
 import pandas as pd
 from datetime import datetime
 
-# 📥 Signalni signals.csv faylga yozish (indikatorlar bilan)
+# ✅ Signalni signals.csv faylga yozish (indikatorlar bilan to‘liq versiya)
 def save_to_csv(symbol, timeframe, signal, confidence, price,
                 ema_fast=None, ema_slow=None, rsi=None,
                 macd=None, macd_signal=None, adx=None, stoch_rsi=None):
     """
-    Signalni signals.csv faylga to‘liq indikatorlar bilan yozadi.
+    Signalni barcha indikatorlar bilan signals.csv faylga yozadi.
+    Fayl mavjud bo'lmasa, sarlavhalar bilan yaratadi.
     """
     filename = "signals.csv"
     file_exists = os.path.isfile(filename)
@@ -35,12 +36,10 @@ def save_to_csv(symbol, timeframe, signal, confidence, price,
     except Exception as e:
         print(f"❌ CSV yozishda xatolik: {e}")
 
-
-# 🧹 signals.csv faylini tozalab, AI uchun tayyorlaydi
+# ✅ signals.csv faylini tozalab, AI uchun tayyorlaydi
 def clean_signals(conf_threshold=0.6):
     """
-    Signal logini tozalab, faqat kuchli ishonchli va to‘liq indikatorli ma’lumotlarni saqlaydi.
-    Natijani signals_cleaned.csv faylga yozadi.
+    Kuchli, to‘liq indikatorli signallarni tanlab signals_cleaned.csv faylga yozadi.
     """
     try:
         df = pd.read_csv("signals.csv")
@@ -63,11 +62,10 @@ def clean_signals(conf_threshold=0.6):
         print(f"❌ clean_signals() xatoligi: {e}")
         return 0
 
-
-# 🔁 Takroriy signalni aniqlash
+# ✅ Takroriy signalni aniqlash
 def is_duplicate_signal(symbol, timeframe, signal, price, threshold=0.01):
     """
-    Oxirgi yozilgan signal bilan taqqoslab, agar aynan shu turdagi signal va narx yaqin bo‘lsa – dublikat deb hisoblaydi.
+    Oxirgi signal bilan bir xil bo‘lsa va narx farqi kichik bo‘lsa, dublikat deb hisoblanadi.
     """
     try:
         df = pd.read_csv("signals.csv")
