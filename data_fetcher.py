@@ -1,57 +1,57 @@
+from api_manager import get_api_key
+from telegram_bot import handle_api_error
 import requests
 import pandas as pd
 
-API_KEY = "9cdcbb93d65249b399e19a4fa2c4498f"
 BASE_URL = "https://api.twelvedata.com/time_series"
 
 def fetch_data(symbol="XAU/USD", interval="15min", outputsize=500):
-    """
-    API orqali XAU/USD narxlarini olish.
-    Barcha xatoliklar aniqlanadi va foydalanuvchiga tushunarli tarzda qaytariladi.
-    """
-    params = {
-        "symbol": symbol,
-        "interval": interval,
-        "outputsize": outputsize,
-        "apikey": API_KEY,
-        "format": "JSON"
-    }
+    for attempt in range(2):  # har bir so‘rovni 2 marta har xil kalit bilan urinib ko‘ramiz
+        api_key = get_api_key()
 
-    try:
-        response = requests.get(BASE_URL, params=params)
-        response.raise_for_status()
-        data = response.json()
+        params = {
+            "symbol": symbol,
+            "interval": interval,
+            "outputsize": outputsize,
+            "apikey": api_key,
+            "format": "JSON"
+        }
 
-        # 429 – API limit tugagan
-        if data.get("code") == 429:
-            print("❌ API limiti tugadi: kunlik limitdan oshib ketdingiz.")
-            print(f"📎 {data.get('message')}")
-            return pd.DataFrame()
+        try:
+            response = requests.get(BASE_URL, params=params)
+            response.raise_for_status()
+            data = response.json()
 
-        # API javobi noto‘g‘ri (values yo‘q)
-        if "values" not in data or not data["values"]:
-            print(f"⚠️ Ma'lumot yo‘q yoki bo‘sh dataframe. API natijasi: {data}")
-            return pd.DataFrame()
+            if data.get("code") == 429:
+                print(f"⚠️ API limiti tugadi: {api_key[:8]}...")
+                handle_api_error(f"API kalit limiti tugadi: {api_key[:8]}...")
+                continue  # keyingi kalitga o‘tish
 
-        # Ma'lumotni DataFrame formatiga o'tkazish
-        df = pd.DataFrame(data["values"])
-        df["datetime"] = pd.to_datetime(df["datetime"])
-        df = df.sort_values("datetime")
+            if "values" not in data or not data["values"]:
+                msg = f"⚠️ Ma'lumot yo‘q. JSON: {data}"
+                print(msg)
+                handle_api_error(msg)
+                return pd.DataFrame()
 
-        # Satr turlari floatga o‘tkaziladi
-        num_cols = ["open", "high", "low", "close", "volume"]
-        for col in num_cols:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+            # JSON'dan DataFrame
+            df = pd.DataFrame(data["values"])
+            df["datetime"] = pd.to_datetime(df["datetime"])
+            df = df.sort_values("datetime")
 
-        return df
+            for col in ["open", "high", "low", "close", "volume"]:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    except requests.exceptions.HTTPError as e:
-        if "502" in str(e):
-            print("❌ TwelveData server ishlamayapti (502 Bad Gateway). Keyinroq urinib ko‘ring.")
-        else:
-            print(f"❌ API so‘rov xatosi: {e}")
-        return pd.DataFrame()
+            return df
 
-    except Exception as e:
-        print(f"❌ fetch_data() xatolik: {e}")
-        return pd.DataFrame()
+        except requests.exceptions.HTTPError as e:
+            msg = f"❌ HTTP xatolik: {e}"
+            print(msg)
+            handle_api_error(msg)
+
+        except Exception as e:
+            msg = f"❌ Umumiy xatolik: {e}"
+            print(msg)
+            handle_api_error(msg)
+
+    print("❌ Barcha API kalitlar limitda yoki xato.")
+    return pd.DataFrame()
