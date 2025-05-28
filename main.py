@@ -11,7 +11,6 @@ from utils.trade import calculate_sl_tp, send_order
 from config import SYMBOL, TIMEFRAMES, CHECK_INTERVAL
 from telegram_bot import send_message, send_chart, is_paused, start_bot_polling
 
-
 def run_trading_loop():
     tf_index = 0
     print("✅ Trading loop boshlandi")
@@ -36,7 +35,6 @@ def run_trading_loop():
 
             df = apply_indicators(df)
             signal, confidence = generate_signal(df)
-
             last = df.iloc[-1]
             price = last['close']
 
@@ -45,20 +43,17 @@ def run_trading_loop():
                 time.sleep(CHECK_INTERVAL)
                 continue
 
-            # 🔁 Takroriy signalni tekshirish
             if is_duplicate_signal(SYMBOL, timeframe, signal, price):
                 print("⚠️ Takroriy signal, logga yozilmadi.")
                 time.sleep(CHECK_INTERVAL)
                 continue
 
             try:
-                # 📐 SL/TP hisoblash
                 sl, tp = calculate_sl_tp(df, signal.lower().replace("kuchli ", ""))
             except Exception as e:
                 print(f"❌ SL/TP hisoblashda xato: {e}")
                 continue
 
-            # 📩 Telegram xabari
             msg = (
                 f"📍 {SYMBOL} | {timeframe}\n"
                 f"🔔 Signal: {signal}\n"
@@ -67,7 +62,6 @@ def run_trading_loop():
                 f"🛡 SL: {sl:.2f} | 🎯 TP: {tp:.2f}"
             )
 
-            # 📈 Grafik chizish va yuborish
             try:
                 df_tail = df.tail(50)
                 plt.figure(figsize=(10, 4))
@@ -87,14 +81,17 @@ def run_trading_loop():
             except Exception as e:
                 print(f"❌ Grafik chizishda xato: {e}")
 
-            # 🗃 Signalni logga yozish (indikatorlar bilan)
             save_to_csv(
                 SYMBOL, timeframe, signal, confidence, price,
-                last['ema_fast'], last['ema_slow'], last['rsi'],
-                last['macd'], last['macd_signal'], last['adx'], last['stoch_rsi']
+                ema_fast=last.get("ema_fast"),
+                ema_slow=last.get("ema_slow"),
+                rsi=last.get("rsi"),
+                macd=last.get("macd"),
+                macd_signal=last.get("macd_signal"),
+                adx=last.get("adx"),
+                stoch_rsi=last.get("stoch_rsi")
             )
 
-            # 🛒 Order yuborish
             try:
                 send_order(SYMBOL, signal.lower().replace("kuchli ", ""), 0.01, sl, tp)
             except Exception as e:
@@ -106,7 +103,6 @@ def run_trading_loop():
             send_message(f"❌ Botda xatolik:\n{err}")
 
         time.sleep(CHECK_INTERVAL)
-
 
 if __name__ == "__main__":
     print("🤖 Telegram bot ishga tushmoqda...")
