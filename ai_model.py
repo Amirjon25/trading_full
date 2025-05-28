@@ -1,55 +1,73 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 import joblib
 import os
 
+MODEL_PATH = "trained_model.pkl"
+DATA_PATH = "signals_cleaned.csv"
+
+# ✅ Modelni o‘qitish
 def train_model():
     try:
-        df = pd.read_csv("signals_cleaned.csv")
-
-        if df.empty or "signal" not in df.columns:
-            print("❌ signal mavjud emas yoki fayl bo‘sh!")
+        # Fayl mavjudligini tekshiramiz
+        if not os.path.exists(DATA_PATH):
+            print(f"❌ Fayl topilmadi: {DATA_PATH}")
             return
 
-        # Faol ustunlarni tanlash (misol uchun)
+        df = pd.read_csv(DATA_PATH)
+
+        if df.empty:
+            print("❌ Fayl bo‘sh! Trening uchun yetarli signal yo‘q.")
+            return
+
+        if "signal" not in df.columns:
+            print("❌ 'signal' ustuni yo‘q. Faylni tekshiring.")
+            return
+
+        # Foydalaniladigan ustunlar
         features = ["confidence", "price"]
         df = df.dropna(subset=features + ["signal"])
+        
+        if df.shape[0] < 2:
+            print("❌ Model uchun kamida 2 ta signal kerak.")
+            return
 
         X = df[features]
         y = df["signal"]
 
-        if len(X) < 2:
-            print("❌ Model o‘qitish uchun kamida 2 ta signal kerak.")
-            return
-
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
         model = RandomForestClassifier(n_estimators=100, random_state=42)
         model.fit(X_train, y_train)
 
-        joblib.dump(model, "trained_model.pkl")
+        joblib.dump(model, MODEL_PATH)
+        print("✅ Model o‘qitildi va saqlandi!")
 
-        print("✅ Model o‘qitildi!")
         y_pred = model.predict(X_test)
-        print("📊 Klassifikatsiya hisobot:")
+        print("📊 Tahlil:")
         print(classification_report(y_test, y_pred))
 
-    except FileNotFoundError:
-        print("❌ signals_cleaned.csv topilmadi!")
     except Exception as e:
-        print(f"❌ Model o‘qitishda xatolik: {e}")
+        print(f"❌ train_model() xatolik: {e}")
 
-def predict_signal(confidence, price):
+# ✅ Modeldan bashorat olish
+def predict_from_model(data: dict):
+    """
+    Argument:
+        data = {"confidence": 0.73, "price": 2349.5}
+    """
     try:
-        if not os.path.exists("trained_model.pkl"):
-            print("❌ Model mavjud emas, avval train_model() chaqiring.")
-            return
+        if not os.path.exists(MODEL_PATH):
+            print("❌ Model fayli mavjud emas. Avval train_model() chaqiring.")
+            return None
 
-        model = joblib.load("trained_model.pkl")
-        prediction = model.predict([[confidence, price]])
+        model = joblib.load(MODEL_PATH)
+        X = [[data["confidence"], data["price"]]]
+        prediction = model.predict(X)
         return prediction[0]
+
     except Exception as e:
-        print(f"❌ Bashoratda xatolik: {e}")
+        print(f"❌ predict_from_model() xatolik: {e}")
         return None
