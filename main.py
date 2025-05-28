@@ -67,7 +67,6 @@ def run_trading_loop():
                 f"🛡 SL: {sl:.2f} | 🎯 TP: {tp:.2f}"
             )
 
-
             # 📈 Grafik chizish va yuborish
             try:
                 df_tail = df.tail(50)
@@ -88,8 +87,12 @@ def run_trading_loop():
             except Exception as e:
                 print(f"❌ Grafik chizishda xato: {e}")
 
-            # 🗃 Signalni logga yozish
-            save_to_csv(SYMBOL, timeframe, signal, confidence, price)
+            # 🗃 Signalni logga yozish (indikatorlar bilan)
+            save_to_csv(
+                SYMBOL, timeframe, signal, confidence, price,
+                last['ema_fast'], last['ema_slow'], last['rsi'],
+                last['macd'], last['macd_signal'], last['adx'], last['stoch_rsi']
+            )
 
             # 🛒 Order yuborish
             try:
