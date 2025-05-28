@@ -84,20 +84,33 @@ def handle_help(message):
     help_text = (
         "📘 Komandalar:"
 
-        "/start – Botga kirish"
-        "/pause – Botni to‘xtatish (ADMIN)"
-        "/resume – Botni yoqish (ADMIN)"
-        "/status – Bot holatini ko‘rish"
-        "/filtercsv [15min] – Timeframe bo‘yicha signal"
-        "/filterconf [80] – Confidence bo‘yicha"
-        "/stats – Signal statistikasi"
-        "/trainmodel – Modelni qayta o‘qitish"
-        "/tozalash – Tozalash (clean_signals.csv)"
-        "/reset – Model oxirgi signal tahlili"
-        "/grafik [8ta raqam] – AI bashorat"
-        "/exportcsv – CSV faylni yuborish"
-        "/aistats – AI confusion matrix grafigi"
-        "/info - ai bashorat"
+        "
+        /start – Botga kirish"
+        "
+        /pause – Botni to‘xtatish (ADMIN)"
+        "
+        /resume – Botni yoqish (ADMIN)"
+        "
+        /status – Bot holatini ko‘rish"
+        "
+        /filter [15min] – Timeframe bo‘yicha signal"
+        "
+        /filterfoiz [80] – Confidence bo‘yicha"
+        "
+        /statistika – Signal statistikasi"
+        "
+        /reset – Modelni qayta o‘qitish"
+        "
+        /tozalash – Tozalash (clean_signals.csv)"
+        "
+        /info – Model oxirgi signal tahlili"
+        "
+        /baborat [8ta raqam] – AI bashorat"
+        "
+        /csv – CSV faylni yuborish"
+        "
+        /grafik – AI confusion matrix grafigi"
+        
 )
     bot.send_message(message.chat.id, help_text)
 
@@ -149,12 +162,12 @@ def handle_csv(message):
     except:
         bot.send_message(message.chat.id, "❌ Fayl mavjud emas.")
 
-@bot.message_handler(commands=['filtercsv'])
-def handle_filtercsv(message):
+@bot.message_handler(commands=['filter'])
+def handle_filter(message):
     try:
         args = message.text.split()
         if len(args) < 2:
-            return bot.reply_to(message, "❌ Foydalanish: /filtercsv 15min")
+            return bot.reply_to(message, "❌ Foydalanish: /filter 15min")
         tf = args[1]
         df = pd.read_csv("signals.csv")
         filtered = df[df['timeframe'] == tf]
@@ -166,12 +179,12 @@ def handle_filtercsv(message):
     except Exception as e:
         bot.reply_to(message, f"❌ Xatolik: {e}")
 
-@bot.message_handler(commands=['filterconf'])
-def handle_filterconf(message):
+@bot.message_handler(commands=['filterfoiz'])
+def handle_filterfoiz(message):
     try:
         args = message.text.split()
         if len(args) < 2:
-            return bot.reply_to(message, "❌ Foydalanish: /filterconf 80")
+            return bot.reply_to(message, "❌ Foydalanish: /filterfoiz 80")
         thres = float(args[1])
         df = pd.read_csv("signals.csv")
         filtered = df[df['confidence'] >= thres / 100.0]
