@@ -1,59 +1,52 @@
-import pandas as pd
-import numpy as np
+# ✅ fake_signals_generator.py – test uchun signals.csv to‘ldiradi
+import csv
+import random
+from datetime import datetime
 
-def apply_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
+FILENAME = "signals.csv"
 
-    # --- EMA (Exponential Moving Average)
-    df['ema_fast'] = df['close'].ewm(span=9, adjust=False).mean()
-    df['ema_slow'] = df['close'].ewm(span=21, adjust=False).mean()
+def generate_signal_row():
+    base_time = datetime.now()
+    signal = random.choice(["buy", "sell"])
+    confidence = round(random.uniform(0.6, 0.95), 2)
+    price = round(random.uniform(1900, 2000), 2)
 
-    # --- RSI (Relative Strength Index)
-    delta = df['close'].diff()
-    gain = delta.where(delta > 0, 0)
-    loss = -delta.where(delta < 0, 0)
-    avg_gain = gain.rolling(window=14).mean()
-    avg_loss = loss.rolling(window=14).mean()
-    rs = avg_gain / (avg_loss + 1e-9)
-    df['rsi'] = 100 - (100 / (1 + rs))
+    ema_fast = price + random.uniform(-1, 1)
+    ema_slow = price + random.uniform(-1, 1)
+    macd = random.uniform(-2, 2)
+    macd_signal = macd + random.uniform(-0.5, 0.5)
+    rsi = random.uniform(20, 80)
+    adx = random.uniform(10, 35)
+    stoch_rsi = random.uniform(0, 1)
 
-    # --- Stochastic RSI
-    min_rsi = df['rsi'].rolling(window=14).min()
-    max_rsi = df['rsi'].rolling(window=14).max()
-    df['stoch_rsi'] = (df['rsi'] - min_rsi) / (max_rsi - min_rsi + 1e-9)
+    return [
+        base_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "XAU/USD",
+        "15min",
+        signal,
+        confidence,
+        price,
+        round(ema_fast, 4),
+        round(ema_slow, 4),
+        round(macd, 4),
+        round(macd_signal, 4),
+        round(rsi, 2),
+        round(adx, 2),
+        round(stoch_rsi, 3)
+    ]
 
-    # --- MACD (Moving Average Convergence Divergence)
-    ema12 = df['close'].ewm(span=12, adjust=False).mean()
-    ema26 = df['close'].ewm(span=26, adjust=False).mean()
-    df['macd'] = ema12 - ema26
-    df['macd_signal'] = df['macd'].ewm(span=9, adjust=False).mean()
+def generate_fake_signals(n=50):
+    with open(FILENAME, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "datetime", "symbol", "timeframe", "signal", "confidence", "price",
+            "ema_fast", "ema_slow", "macd", "macd_signal", "rsi", "adx", "stoch_rsi"
+        ])
 
-    # --- Bollinger Bands
-    df['bollinger_middle'] = df['close'].rolling(window=20).mean()
-    rolling_std = df['close'].rolling(window=20).std()
-    df['bollinger_upper'] = df['bollinger_middle'] + 2 * rolling_std
-    df['bollinger_lower'] = df['bollinger_middle'] - 2 * rolling_std
+        for _ in range(n):
+            writer.writerow(generate_signal_row())
 
-    # --- ATR (Average True Range)
-    df['previous_close'] = df['close'].shift(1)
-    high_low = df['high'] - df['low']
-    high_close = (df['high'] - df['previous_close']).abs()
-    low_close = (df['low'] - df['previous_close']).abs()
-    tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-    df['atr'] = tr.rolling(window=14).mean()
+    print(f"✅ {n} ta test signal yaratildi → {FILENAME}")
 
-    # --- ADX (Average Directional Index)
-    up_move = df['high'].diff()
-    down_move = df['low'].diff().abs()
-    plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
-    minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
-
-    tr14 = tr.rolling(window=14).mean()
-    plus_di = 100 * pd.Series(plus_dm).rolling(window=14).mean() / (tr14 + 1e-9)
-    minus_di = 100 * pd.Series(minus_dm).rolling(window=14).mean() / (tr14 + 1e-9)
-    dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di + 1e-9)
-    df['adx'] = dx.rolling(window=14).mean()
-
-    # Tozalash va indeksni tiklash
-    df.drop(columns=['previous_close'], inplace=True)
-    return df.dropna().reset_index(drop=True)
+if __name__ == "__main__":
+    generate_fake_signals(100)
