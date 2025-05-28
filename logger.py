@@ -1,80 +1,78 @@
 import csv
 import os
-from datetime import datetime
 import pandas as pd
+from datetime import datetime
 
-# Fayl nomlari
-SIGNALS_FILE = "signals.csv"
-CLEANED_FILE = "signals_cleaned.csv"
-
-# ✅ Signalni CSV faylga yozish
+# 📥 Signalni signals.csv faylga yozish
 def save_to_csv(symbol, timeframe, signal, confidence, price):
     """
-    signal: 'BUY', 'SELL', 'KUCHLI BUY', 'KUCHLI SELL'
+    Signalni signals.csv faylga yozadi. Fayl yo‘q bo‘lsa, sarlavha bilan yaratadi.
     """
-    file_exists = os.path.isfile(SIGNALS_FILE)
+    filename = "signals.csv"
+    file_exists = os.path.isfile(filename)
 
-    with open(SIGNALS_FILE, mode='a', newline='') as file:
-        writer = csv.writer(file)
-        if not file_exists:
-            writer.writerow(["timestamp", "symbol", "timeframe", "signal", "confidence", "price"])
-        writer.writerow([
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            symbol,
-            timeframe,
-            signal,
-            round(confidence, 2),
-            round(price, 2)
-        ])
-    print(f"✅ Signal yozildi: {symbol} | {timeframe} | {signal} | {confidence}")
+    try:
+        with open(filename, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            if not file_exists:
+                writer.writerow(["datetime", "symbol", "timeframe", "signal", "confidence", "price"])
+            writer.writerow([
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                symbol,
+                timeframe,
+                signal,
+                round(confidence, 2),
+                round(price, 2)
+            ])
+    except Exception as e:
+        print(f"❌ CSV yozishda xatolik: {e}")
 
-# ✅ Takroriy signalni tekshiradi
-def is_duplicate_signal(symbol, timeframe, signal):
+# 🧹 signals.csv faylini tozalab, AI uchun tayyorlaydi
+def clean_signals(conf_threshold=0.6):
     """
-    signals.csv faylida oxirgi signal aynan shu symbol, timeframe va signal bilan bir xilmi — tekshiradi.
+    Signal logini tozalab, faqat kuchli ishonchli va to‘liq indikatorli ma’lumotlarni saqlaydi.
+    Natijani signals_cleaned.csv faylga yozadi.
     """
     try:
-        if not os.path.exists(SIGNALS_FILE):
-            return False
+        df = pd.read_csv("signals.csv")
+        df = df.dropna()
+        df = df[df["confidence"] >= conf_threshold]
+        df = df[df["signal"].str.lower().isin(["buy", "sell"])]
 
-        df = pd.read_csv(SIGNALS_FILE)
-        if df.empty:
+        required_cols = [
+            "datetime", "symbol", "timeframe", "signal", "confidence", "price",
+            "ema_fast", "ema_slow", "rsi", "macd", "macd_signal", "adx", "stoch_rsi"
+        ]
+        existing_cols = [col for col in required_cols if col in df.columns]
+        df = df[existing_cols]
+
+        df.to_csv("signals_cleaned.csv", index=False)
+        print(f"✅ signals_cleaned.csv saqlandi: {len(df)} ta signal")
+        return len(df)
+
+    except Exception as e:
+        print(f"❌ clean_signals() xatoligi: {e}")
+        return 0
+
+# 🔁 Takroriy signalni aniqlash
+def is_duplicate_signal(symbol, timeframe, signal, price, threshold=0.01):
+    """
+    Oxirgi yozilgan signal bilan taqqoslab, agar aynan shu turdagi signal va narx yaqin bo‘lsa – dublikat deb hisoblaydi.
+    """
+    try:
+        df = pd.read_csv("signals.csv")
+        if df.empty or len(df) < 1:
             return False
 
         last_row = df.iloc[-1]
-        return (
+        same_signal = (
             last_row["symbol"] == symbol and
             last_row["timeframe"] == timeframe and
-            last_row["signal"] == signal
+            last_row["signal"].lower() == signal.lower() and
+            abs(last_row["price"] - price) < threshold
         )
+        return same_signal
 
     except Exception as e:
-        print(f"❌ is_duplicate_signal() xatolik: {e}")
+        print(f"⚠️ Dublikat tekshiruvda xatolik: {e}")
         return False
-
-# ✅ AI uchun signalni tozalaydi
-def clean_signals(conf_threshold=0.6):
-    """
-    `confidence` qiymati conf_threshold dan yuqori bo‘lgan signalni ajratib alohida faylga yozadi
-    """
-    try:
-        if not os.path.exists(SIGNALS_FILE):
-            print("❌ signals.csv fayli mavjud emas.")
-            return
-
-        df = pd.read_csv(SIGNALS_FILE)
-
-        if "signal" not in df.columns:
-            print("❌ 'signal' ustuni signals.csv faylida mavjud emas.")
-            return
-
-        df_clean = df[df["confidence"] >= conf_threshold].copy()
-
-        if df_clean.empty:
-            print("⚠️ Tozalashdan so‘ng hech qanday signal qolmadi.")
-        else:
-            df_clean.to_csv(CLEANED_FILE, index=False)
-            print(f"🧹 {len(df_clean)} ta signal tozalandi va {CLEANED_FILE} faylga yozildi.")
-
-    except Exception as e:
-        print(f"❌ clean_signals() xatolik: {e}")
