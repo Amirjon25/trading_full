@@ -1,73 +1,77 @@
-import os
+# ✅ ai_model.py – AI modelni o‘qitish, bashorat qilish, tozalash
 import pandas as pd
 import joblib
-from sklearn.ensemble import RandomForestClassifier
+from lightgbm import LGBMClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
+import os
 
-MODEL_PATH = "trained_model.pkl"
-DATA_PATH = "signals_cleaned.csv"
+from config import MODEL_FILE, CLEANED_CSV
 
-# ✅ Modelni o‘qitish (train_ai_model)
-def train_ai_model():
+# ✅ Modelni o‘qitish
+
+def train_ai_model(csv_path=CLEANED_CSV):
+    if not os.path.exists(csv_path):
+        print(f"❌ Fayl topilmadi: {csv_path}")
+        return
+
+    df = pd.read_csv(csv_path).dropna()
+    df = df[df['signal'].isin(['buy', 'sell'])]
+
+    df['ema_diff'] = df['ema_fast'] - df['ema_slow']
+    df['macd_diff'] = df['macd'] - df['macd_signal']
+
+    features = ['ema_diff', 'rsi', 'macd_diff', 'adx', 'stoch_rsi']
+    X = df[features]
+    y = df['signal']
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42)
+
+    model = LGBMClassifier(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
+
+    y_pred = model.predict(X_test)
+    print("\n📊 AI Model Tahlili:")
+    print(classification_report(y_test, y_pred))
+
+    joblib.dump(model, MODEL_FILE)
+    print(f"✅ Model saqlandi: {MODEL_FILE}")
+
     try:
-        if not os.path.exists(DATA_PATH):
-            print(f"❌ Fayl topilmadi: {DATA_PATH}")
-            return
+        input_df = pd.DataFrame([X.iloc[-1]], columns=features)
+        pred = model.predict(input_df)[0]
+        conf = max(model.predict_proba(input_df)[0])
+        print(f"🧠 AI Bashorati: {pred.upper()} | Ishonch: {conf * 100:.1f}%")
+    except Exception as e:
+        print(f"⚠️ Bashorat testida xatolik: {e}")
 
-        df = pd.read_csv(DATA_PATH)
 
-        if df.empty or "signal" not in df.columns:
-            print("❌ Fayl bo‘sh yoki 'signal' ustuni mavjud emas.")
-            return
+# ✅ Bashorat funksiyasi (dict formatda row kerak)
+def predict_from_model(row: dict):
+    if not os.path.exists(MODEL_FILE):
+        raise FileNotFoundError("❌ AI modeli topilmadi. Avval train_ai_model() ni chaqiring.")
 
-        # Foydalaniladigan ustunlar
-        df = df.dropna(subset=["confidence", "price", "signal"])
-        if df.shape[0] < 2:
-            print("❌ Kamida 2 ta signal kerak.")
-            return
+    model = joblib.load(MODEL_FILE)
 
-        X = df[["confidence", "price"]]
-        y = df["signal"]
+    try:
+        input_data = pd.DataFrame([{
+            'ema_diff': row['ema_fast'] - row['ema_slow'],
+            'rsi': row['rsi'],
+            'macd_diff': row['macd'] - row['macd_signal'],
+            'adx': row.get('adx', 20),
+            'stoch_rsi': row.get('stoch_rsi', 0.5)
+        }])
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
-
-        model = RandomForestClassifier(n_estimators=100, random_state=42)
-        model.fit(X_train, y_train)
-
-        joblib.dump(model, MODEL_PATH)
-        print("✅ Model o‘qitildi va saqlandi!")
-
-        y_pred = model.predict(X_test)
-        print("📊 Klassifikatsiya hisobot:")
-        print(classification_report(y_test, y_pred))
+        pred = model.predict(input_data)[0]
+        conf = max(model.predict_proba(input_data)[0])
+        return pred, conf
 
     except Exception as e:
-        print(f"❌ train_ai_model() xatolik: {e}")
+        print(f"❌ AI bashoratida xatolik: {e}")
+        return None, 0.0
 
-# ✅ AI model orqali signal bashorati (predict_from_model)
-def predict_from_model(data: dict):
-    """
-    Parametr:
-        data = {"confidence": 0.73, "price": 2349.0}
-    Natija:
-        ("BUY", 0.83)
-    """
-    try:
-        if not os.path.exists(MODEL_PATH):
-            print("❌ Model mavjud emas. Avval train_ai_model() chaqiring.")
-            return None
 
-        model = joblib.load(MODEL_PATH)
-        X = [[data["confidence"], data["price"]]]
-        prediction = model.predict(X)
-        proba = model.predict_proba(X)
-
-        confidence_score = max(proba[0])  # Model ishonch darajasi
-        return prediction[0], round(confidence_score, 2)
-
-    except Exception as e:
-        print(f"❌ predict_from_model() xatolik: {e}")
-        return None
+# ✅ Test rejimda ishga tushurish
+if __name__ == "__main__":
+    train_ai_model()
