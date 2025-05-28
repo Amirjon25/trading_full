@@ -1,53 +1,57 @@
 import requests
 import pandas as pd
-from config import TWELVE_URL
-from api_manager import get_api_key
 
-def fetch_data(symbol="XAU/USD", interval="15min", outputsize=500) -> pd.DataFrame | None:
+API_KEY = "9cdcbb93d65249b399e19a4fa2c4498f"
+BASE_URL = "https://api.twelvedata.com/time_series"
+
+def fetch_data(symbol="XAU/USD", interval="15min", outputsize=500):
     """
-    TwelveData API orqali ma’lumot olib keladi va tayyor DataFrame qaytaradi.
-    :param symbol: Masalan, "XAU/USD"
-    :param interval: Masalan, "15min", "1h", "1day"
-    :param outputsize: Nechta data nuqta kerak (max: 5000)
-    :return: Pandas DataFrame yoki None
+    API orqali XAU/USD narxlarini olish.
+    Barcha xatoliklar aniqlanadi va foydalanuvchiga tushunarli tarzda qaytariladi.
     """
     params = {
         "symbol": symbol,
         "interval": interval,
         "outputsize": outputsize,
-        "apikey": get_api_key(),
+        "apikey": API_KEY,
         "format": "JSON"
     }
 
     try:
-        response = requests.get(TWELVE_URL, params=params, timeout=10)
+        response = requests.get(BASE_URL, params=params)
         response.raise_for_status()
         data = response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"❌ API so‘rov xatosi: {e}")
-        return None
-    except ValueError:
-        print("❌ JSON formatida javob olinmadi.")
-        return None
 
-    if not data or "values" not in data:
-        print(f"❌ API natijasi yaroqsiz yoki 'values' yo‘q: {data}")
-        return None
+        # 429 – API limit tugagan
+        if data.get("code") == 429:
+            print("❌ API limiti tugadi: kunlik limitdan oshib ketdingiz.")
+            print(f"📎 {data.get('message')}")
+            return pd.DataFrame()
 
-    try:
+        # API javobi noto‘g‘ri (values yo‘q)
+        if "values" not in data or not data["values"]:
+            print(f"⚠️ Ma'lumot yo‘q yoki bo‘sh dataframe. API natijasi: {data}")
+            return pd.DataFrame()
+
+        # Ma'lumotni DataFrame formatiga o'tkazish
         df = pd.DataFrame(data["values"])
-        df.rename(columns={"datetime": "time"}, inplace=True)
-        df["time"] = pd.to_datetime(df["time"], errors='coerce')
-        df = df.dropna(subset=["time"])  # noto‘g‘ri datetime’larni olib tashlash
-        df = df.sort_values("time").reset_index(drop=True)
+        df["datetime"] = pd.to_datetime(df["datetime"])
+        df = df.sort_values("datetime")
 
-        numeric_cols = ["open", "high", "low", "close"]
-        for col in numeric_cols:
+        # Satr turlari floatga o‘tkaziladi
+        num_cols = ["open", "high", "low", "close", "volume"]
+        for col in num_cols:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-        df = df.dropna(subset=numeric_cols)  # noto‘g‘ri raqamlarni olib tashlash
         return df
 
+    except requests.exceptions.HTTPError as e:
+        if "502" in str(e):
+            print("❌ TwelveData server ishlamayapti (502 Bad Gateway). Keyinroq urinib ko‘ring.")
+        else:
+            print(f"❌ API so‘rov xatosi: {e}")
+        return pd.DataFrame()
+
     except Exception as e:
-        print(f"❌ DataFrame yaratishda xatolik: {e}")
-        return None
+        print(f"❌ fetch_data() xatolik: {e}")
+        return pd.DataFrame()
