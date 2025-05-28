@@ -43,18 +43,26 @@ while True:
 
         # Faqat ishonchli signal bo‘lsa Telegramga yuboriladi
         if confidence >= 0.6:
-            message = (
-                f"📊 *AI Signal*\n"
-                f"🔔 {SYMBOL} ({interval})\n"
-                f"📈 Signal: *{signal}*\n"
-                f"🎯 Confidence: {confidence:.2f}"
-            )
-            send_message(message)
+    message = (
+        f"📊 *AI Signal*\n"
+        f"🔔 {SYMBOL} ({interval})\n"
+        f"📈 Signal: *{signal}*\n"
+        f"🎯 Confidence: {confidence:.2f}"
+    )
+    send_message(message)
 
-            price = df["close"].iloc[-1]
-            save_to_csv(SYMBOL, interval, signal, confidence, price, **indicators)
-        else:
-            print(f"⚠️ AI ishonchi past ({confidence:.2f}), yuborilmaydi.")
+    price = df["close"].iloc[-1]
+    save_to_csv(
+        SYMBOL,
+        interval,
+        signal,
+        confidence,
+        price,
+        **indicators
+    )
+else:
+    print(f"⚠️ Confidence ({confidence:.2f}) past. Signal loglanmaydi, yuborilmaydi.")
+
 
         # Timeframe oralig‘i bo‘yicha kutish
         print(f"⏳ {wait} sekund kutilyapti...")
