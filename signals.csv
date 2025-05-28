@@ -1,4 +1,4 @@
-datetime,symbol,timeframe,signal,confidence,price,ema_fast,ema_slow,macd,macd_signal,rsi,adx,stoch_rsi
+datetime, symbol, timeframe, signal, confidence, price, ema_fast, ema_slow, rsi, macd, macd_signal, adx, stoch_rsi
 2025-05-28 03:57:05,XAU/USD,15min,KUCHLI BUY,0.99,3305.0
 2025-05-28 03:58:17,XAU/USD,30min,sell,0.65,3304.43
 2025-05-28 03:59:19,XAU/USD,1h,sell,0.64,3303.95
