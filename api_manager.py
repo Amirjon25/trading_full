@@ -1,5 +1,4 @@
 import time
-import random
 
 # 🔐 API kalitlar (xavfsizlik uchun .env faylga o‘tkazish tavsiya etiladi)
 API_KEYS = [
