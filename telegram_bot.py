@@ -84,8 +84,8 @@ def handle_help(message):
     help_text = (
         "📘 Komandalar:"
 
-        "/start – Botga kirish "
-        "/pause – Botni to‘xtatish (ADMIN) "
+        "/start – Botga kirish /n "
+        "/pause – Botni to‘xtatish (ADMIN)\n "
         "/resume – Botni yoqish (ADMIN) "
         "/status – Bot holatini ko‘rish "
         "/filter [15min] – Timeframe bo‘yicha signal "
@@ -94,7 +94,7 @@ def handle_help(message):
         "/reset – Modelni qayta o‘qitish "
         "/tozalash – Tozalash (clean_signals.csv) "
         "/info – Model oxirgi signal tahlili "
-        "/baborat [8ta raqam] – AI bashorat "
+        "/bashorat [8ta raqam] – AI bashorat "
         "/csv – CSV faylni yuborish "
         "/grafik – AI confusion matrix grafigi "
         
