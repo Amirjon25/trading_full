@@ -9,7 +9,9 @@ MODEL_PATH = "trained_model.pkl"
 DATA_PATH = "signals_cleaned.csv"
 
 # ✅ Modelni o‘qitish
-def train_model():
+
+def train_ai_model():
+    ...
     try:
         if not os.path.exists(DATA_PATH):
             print("❌ Fayl topilmadi:", DATA_PATH)
