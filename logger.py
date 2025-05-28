@@ -1,14 +1,14 @@
-# ✅ logger.py – signalni CSV faylga yozish, tozalash va takroriy signalni nazorat qilish
 import csv
 import os
 import pandas as pd
 from datetime import datetime
 
-# 📥 Signalni signals.csv faylga yozish
-
-def save_to_csv(symbol, timeframe, signal, confidence, price):
+# 📥 Signalni signals.csv faylga yozish (indikatorlar bilan)
+def save_to_csv(symbol, timeframe, signal, confidence, price,
+                ema_fast=None, ema_slow=None, rsi=None,
+                macd=None, macd_signal=None, adx=None, stoch_rsi=None):
     """
-    Signalni signals.csv faylga yozadi. Fayl yo‘q bo‘lsa, sarlavha bilan yaratadi.
+    Signalni signals.csv faylga to‘liq indikatorlar bilan yozadi.
     """
     filename = "signals.csv"
     file_exists = os.path.isfile(filename)
@@ -23,18 +23,20 @@ def save_to_csv(symbol, timeframe, signal, confidence, price):
                 ])
             writer.writerow([
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                symbol,
-                timeframe,
-                signal,
-                round(confidence, 2),
-                round(price, 2),
-                None, None, None, None, None, None, None  # indikatorlar keyinchalik to‘ldiriladi
+                symbol, timeframe, signal, round(confidence, 2), round(price, 2),
+                round(ema_fast, 4) if ema_fast is not None else None,
+                round(ema_slow, 4) if ema_slow is not None else None,
+                round(rsi, 4) if rsi is not None else None,
+                round(macd, 4) if macd is not None else None,
+                round(macd_signal, 4) if macd_signal is not None else None,
+                round(adx, 4) if adx is not None else None,
+                round(stoch_rsi, 4) if stoch_rsi is not None else None
             ])
     except Exception as e:
         print(f"❌ CSV yozishda xatolik: {e}")
 
-# 🧹 signals.csv faylini tozalab, AI uchun tayyorlaydi
 
+# 🧹 signals.csv faylini tozalab, AI uchun tayyorlaydi
 def clean_signals(conf_threshold=0.6):
     """
     Signal logini tozalab, faqat kuchli ishonchli va to‘liq indikatorli ma’lumotlarni saqlaydi.
@@ -44,9 +46,7 @@ def clean_signals(conf_threshold=0.6):
         df = pd.read_csv("signals.csv")
         df = df.dropna()
         df = df[df["confidence"] >= conf_threshold]
-
-        df["signal"] = df["signal"].str.lower().str.replace("kuchli ", "")
-        df = df[df["signal"].isin(["buy", "sell"])]
+        df = df[df["signal"].str.lower().isin(["buy", "sell"])]
 
         required_cols = [
             "datetime", "symbol", "timeframe", "signal", "confidence", "price",
@@ -63,8 +63,8 @@ def clean_signals(conf_threshold=0.6):
         print(f"❌ clean_signals() xatoligi: {e}")
         return 0
 
-# 🔁 Takroriy signalni aniqlash
 
+# 🔁 Takroriy signalni aniqlash
 def is_duplicate_signal(symbol, timeframe, signal, price, threshold=0.01):
     """
     Oxirgi yozilgan signal bilan taqqoslab, agar aynan shu turdagi signal va narx yaqin bo‘lsa – dublikat deb hisoblaydi.
@@ -78,7 +78,7 @@ def is_duplicate_signal(symbol, timeframe, signal, price, threshold=0.01):
         same_signal = (
             last_row["symbol"] == symbol and
             last_row["timeframe"] == timeframe and
-            last_row["signal"].lower().replace("kuchli ", "") == signal.lower().replace("kuchli ", "") and
+            last_row["signal"].lower() == signal.lower() and
             abs(last_row["price"] - price) < threshold
         )
         return same_signal
